@@ -1,5 +1,4 @@
 import os
-import itertools
 from itertools import chain
 from typing import List, Tuple, Dict
 from datetime import datetime
@@ -63,7 +62,15 @@ metadata.loc[
 metadata["reg_dt"] = metadata["reg_datetime"].dt.date
 metadata["type"] = metadata["magazine_id"].apply(lambda x: "개인" if x == 0.0 else "매거진")
 metadata["reg_dt"] = pd.to_datetime(metadata["reg_dt"])
+read_rowwise = read_rowwise.merge(
+    metadata[["id", "reg_dt"]], how="left", left_on="article_id", right_on="id"
+)
+read_rowwise = read_rowwise[read_rowwise["article_id"] != ""]
 
+read_total = pd.DataFrame(
+    read_rowwise.groupby(["user_id"])["article_id"].unique()
+).reset_index()
+read_total.columns = ["user_id", "article_list"]
 
 valid = pd.read_csv(path + "/predict/dev.users", header=None)
 
@@ -71,17 +78,6 @@ valid = pd.read_csv(path + "/predict/dev.users", header=None)
 def load_data(
     read_rowwise: pd.DataFrame,
 ) -> Tuple[Dict[str, int], Dict[int, str], csc_matrix]:
-    # 협업 필터링 기반의 모델
-    read_rowwise = read_rowwise.merge(
-        metadata[["id", "reg_dt"]], how="left", left_on="article_id", right_on="id"
-    )
-    read_rowwise = read_rowwise[read_rowwise["article_id"] != ""]
-
-    read_total = pd.DataFrame(
-        read_rowwise.groupby(["user_id"])["article_id"].unique()
-    ).reset_index()
-    read_total.columns = ["user_id", "article_list"]
-
     read_rowwise = read_rowwise[
         (read_rowwise["id"].notnull()) & (read_rowwise["reg_dt"].notnull())
     ]
